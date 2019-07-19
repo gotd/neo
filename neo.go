@@ -46,7 +46,7 @@ func (t *Time) Travel(d time.Duration) time.Time {
 }
 
 // TravelDate applies AddDate to current time and returns result.
-func (t *Time) TravelDate(years int, months int, days int) time.Time {
+func (t *Time) TravelDate(years, months, days int) time.Time {
 	t.mux.Lock()
 	now := t.now.AddDate(years, months, days)
 	t.now = now
