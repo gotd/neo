@@ -36,38 +36,20 @@ func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
 	return len(p), nil
 }
 
-func (PacketConn) Close() error {
-	panic("implement me")
-}
+func (c PacketConn) LocalAddr() net.Addr { return c.addr }
 
-func (c PacketConn) LocalAddr() net.Addr {
-	return c.addr
-}
-
-func (PacketConn) SetDeadline(t time.Time) error {
-	panic("implement me")
-}
-
-func (PacketConn) SetReadDeadline(t time.Time) error {
-	panic("implement me")
-}
-
-func (PacketConn) SetWriteDeadline(t time.Time) error {
-	panic("implement me")
-}
+func (PacketConn) Close() error                       { panic("implement me") }
+func (PacketConn) SetDeadline(t time.Time) error      { panic("implement me") }
+func (PacketConn) SetReadDeadline(t time.Time) error  { panic("implement me") }
+func (PacketConn) SetWriteDeadline(t time.Time) error { panic("implement me") }
 
 type NetAddr struct {
 	Net     string
 	Address string
 }
 
-func (n NetAddr) Network() string {
-	return n.Net
-}
-
-func (n NetAddr) String() string {
-	return n.Address
-}
+func (n NetAddr) Network() string { return n.Net }
+func (n NetAddr) String() string  { return n.Address }
 
 func (n *Net) ListenPacket(network, address string) (net.PacketConn, error) {
 	a := &NetAddr{
