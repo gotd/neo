@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -22,6 +23,8 @@ type PacketConn struct {
 	packets chan packet
 	addr    net.Addr
 	net     *Net
+
+	closed bool
 }
 
 func addrKey(a net.Addr) string {
@@ -31,9 +34,19 @@ func addrKey(a net.Addr) string {
 	return a.Network() + "/" + a.String()
 }
 
+func (c *PacketConn) ok() bool {
+	if c == nil {
+		return false
+	}
+	return !c.closed
+}
+
 // ReadFrom reads a packet from the connection,
 // copying the payload into p.
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	if !c.ok() {
+		return 0, nil, syscall.EINVAL
+	}
 	pp := <-c.packets
 	n = copy(p, pp.buf)
 	return n, pp.addr, nil
@@ -41,6 +54,9 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 
 // WriteTo writes a packet with payload p to addr.
 func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
+	if !c.ok() {
+		return 0, syscall.EINVAL
+	}
 	c.net.peers[addrKey(a)].packets <- packet{
 		addr: c.addr,
 		buf:  append([]byte{}, p...),
@@ -50,7 +66,16 @@ func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
 
 func (c PacketConn) LocalAddr() net.Addr { return c.addr }
 
-func (PacketConn) Close() error                       { panic("implement me") }
+// Close closes the connection.
+func (c *PacketConn) Close() error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	c.closed = true
+	close(c.packets)
+	return nil
+}
+
 func (PacketConn) SetDeadline(t time.Time) error      { panic("implement me") }
 func (PacketConn) SetReadDeadline(t time.Time) error  { panic("implement me") }
 func (PacketConn) SetWriteDeadline(t time.Time) error { panic("implement me") }
