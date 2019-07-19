@@ -28,8 +28,8 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	return n, pp.addr, nil
 }
 
-func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	c.net.peers[addr.String()].packets <- packet{
+func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
+	c.net.peers[a.Network()+"/"+a.String()].packets <- packet{
 		addr: c.addr,
 		buf:  append([]byte{}, p...),
 	}
@@ -66,7 +66,7 @@ func (n NetAddr) Network() string {
 }
 
 func (n NetAddr) String() string {
-	return n.Net + "/" + n.Address
+	return n.Address
 }
 
 func (n *Net) ListenPacket(network, address string) (net.PacketConn, error) {
@@ -80,6 +80,6 @@ func (n *Net) ListenPacket(network, address string) (net.PacketConn, error) {
 		addr:    a,
 		packets: make(chan packet, 10),
 	}
-	n.peers[a.String()] = pc
+	n.peers[a.Network()+"/"+a.String()] = pc
 	return pc, nil
 }

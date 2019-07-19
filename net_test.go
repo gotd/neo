@@ -22,7 +22,7 @@ func TestNet_ListenPacket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if addr.String() != "v/bar:123" {
+	if addr.String() != "bar:123" {
 		t.Errorf("bad addr: %s", addr)
 	}
 	if string(buf[:n]) != "hello world" {
