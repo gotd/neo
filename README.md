@@ -2,7 +2,7 @@
 
 # neo
 
-Package neo implements side effects (network, time) simulation for testing.
+Package `neo` implements side effects (network, time) simulation for testing.
 
 > Wake up, Neo...
 
