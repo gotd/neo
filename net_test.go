@@ -3,7 +3,6 @@ package neo
 import "testing"
 
 func TestNet_ListenPacket(t *testing.T) {
-
 	nt := &Net{
 		peers: make(map[string]*PacketConn),
 	}
