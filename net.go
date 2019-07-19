@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -24,7 +25,8 @@ type PacketConn struct {
 	addr    net.Addr
 	net     *Net
 
-	closed bool
+	closedMux sync.Mutex
+	closed    bool
 }
 
 func addrKey(a net.Addr) string {
@@ -38,6 +40,8 @@ func (c *PacketConn) ok() bool {
 	if c == nil {
 		return false
 	}
+	c.closedMux.Lock()
+	defer c.closedMux.Unlock()
 	return !c.closed
 }
 
@@ -64,11 +68,16 @@ func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
 	return len(p), nil
 }
 
-func (c PacketConn) LocalAddr() net.Addr { return c.addr }
+func (c *PacketConn) LocalAddr() net.Addr { return c.addr }
 
 // Close closes the connection.
 func (c *PacketConn) Close() error {
 	if !c.ok() {
+		return syscall.EINVAL
+	}
+	c.closedMux.Lock()
+	defer c.closedMux.Unlock()
+	if c.closed {
 		return syscall.EINVAL
 	}
 	c.closed = true
