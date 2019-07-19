@@ -2,12 +2,13 @@
 
 # neo
 
-Package neo implements side effects simulation for testing.
+Package neo implements side effects (network, time) simulation for testing.
 
 > Wake up, Neo...
 
 Replace side effects with explicit dependencies so you can sleep at
-night.
+night. Abuse time and network simulation in unit tests and reduce flaky,
+complicated and long integration tests.
 
 ```go
 package main
