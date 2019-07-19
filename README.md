@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/gortc.io/neo?status.svg)](https://godoc.org/gortc.io/neo)
+[![GoDoc](https://godoc.org/github.com/gortc/neo?status.svg)](https://godoc.org/github.com/gortc/neo)
 
 # neo
 
