@@ -1,2 +1,0 @@
-// Package testutil.
-package testutil

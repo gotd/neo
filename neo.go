@@ -1,5 +1,5 @@
 // Package neo implements side effects simulation for testing.
-package neo
+package neo // import "gortc.io/neo"
 
 import (
 	"sync"
