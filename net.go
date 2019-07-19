@@ -85,9 +85,9 @@ func (c *PacketConn) Close() error {
 	return nil
 }
 
-func (PacketConn) SetDeadline(t time.Time) error      { panic("implement me") }
-func (PacketConn) SetReadDeadline(t time.Time) error  { panic("implement me") }
-func (PacketConn) SetWriteDeadline(t time.Time) error { panic("implement me") }
+func (*PacketConn) SetDeadline(t time.Time) error      { panic("implement me") }
+func (*PacketConn) SetReadDeadline(t time.Time) error  { panic("implement me") }
+func (*PacketConn) SetWriteDeadline(t time.Time) error { panic("implement me") }
 
 type NetAddr struct {
 	Net     string
