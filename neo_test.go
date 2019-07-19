@@ -10,6 +10,14 @@ func TestTime(t *testing.T) {
 	sim := NewTime(now)
 	sim.TravelDate(1, 0, 0)
 	if sim.Now().Year() != 2050 {
-		t.Error("temporal anomaly detected")
+		t.Fatal("temporal anomaly detected")
+	}
+	sim.Set(now)
+	if !sim.Now().Equal(now) {
+		t.Fatal("failed to go back in time")
+	}
+	sim.Travel(time.Second * 10)
+	if sim.Now().Second() != 21 {
+		t.Fatal("10 second shift failed")
 	}
 }
