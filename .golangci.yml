@@ -44,13 +44,6 @@ issues:
       linters:
         - gocritic
 
-    # Ease linting on benchmarking code.
-    - path: cmd/stun-bench/
-      linters:
-        - gosec
-        - errcheck
-        - unparam
-
     - path: ^cmd/
       linters:
         - gocyclo
