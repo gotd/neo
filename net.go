@@ -1,7 +1,9 @@
 package neo
 
 import (
+	"errors"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -22,14 +24,24 @@ type PacketConn struct {
 	net     *Net
 }
 
+func addrKey(a net.Addr) string {
+	if u, ok := a.(*net.UDPAddr); ok {
+		return "udp/" + u.String()
+	}
+	return a.Network() + "/" + a.String()
+}
+
+// ReadFrom reads a packet from the connection,
+// copying the payload into p.
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	pp := <-c.packets
 	n = copy(p, pp.buf)
 	return n, pp.addr, nil
 }
 
+// WriteTo writes a packet with payload p to addr.
 func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
-	c.net.peers[a.Network()+"/"+a.String()].packets <- packet{
+	c.net.peers[addrKey(a)].packets <- packet{
 		addr: c.addr,
 		buf:  append([]byte{}, p...),
 	}
@@ -51,17 +63,40 @@ type NetAddr struct {
 func (n NetAddr) Network() string { return n.Net }
 func (n NetAddr) String() string  { return n.Address }
 
+// ResolveUDPAddr returns an address of UDP end point.
+func (n *Net) ResolveUDPAddr(network, address string) (*net.UDPAddr, error) {
+	a := &net.UDPAddr{
+		Port: 0,
+		IP:   net.IPv4(127, 0, 0, 1),
+	}
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	if a.IP = net.ParseIP(host); a.IP == nil {
+		// Probably we should use virtual DNS here.
+		return nil, errors.New("bad IP")
+	}
+	if a.Port, err = strconv.Atoi(port); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// ListenPacket announces on the local network address.
 func (n *Net) ListenPacket(network, address string) (net.PacketConn, error) {
-	a := &NetAddr{
-		// TODO: use virtual DNS.
-		Address: address,
-		Net:     network,
+	if network != "udp4" && network != "udp" && network != "udp6" {
+		return nil, errors.New("bad net")
+	}
+	a, err := n.ResolveUDPAddr(network, address)
+	if err != nil {
+		return nil, err
 	}
 	pc := &PacketConn{
 		net:     n,
 		addr:    a,
 		packets: make(chan packet, 10),
 	}
-	n.peers[a.Network()+"/"+a.String()] = pc
+	n.peers[addrKey(a)] = pc
 	return pc, nil
 }
