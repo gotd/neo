@@ -1,0 +1,11 @@
+*-fuzz.zip
+.idea
+benchmark.*.write
+*.test
+*.out
+bench.go-*
+
+coverage.txt
+
+e2e/dump.pcap
+e2e/log-*.txt
