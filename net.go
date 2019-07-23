@@ -27,6 +27,10 @@ type PacketConn struct {
 
 	closedMux sync.Mutex
 	closed    bool
+
+	deadline      notifier
+	readDeadline  notifier
+	writeDeadline notifier
 }
 
 func addrKey(a net.Addr) string {
@@ -45,15 +49,22 @@ func (c *PacketConn) ok() bool {
 	return !c.closed
 }
 
+var ErrDeadline = errors.New("deadline")
+
 // ReadFrom reads a packet from the connection,
 // copying the payload into p.
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if !c.ok() {
 		return 0, nil, syscall.EINVAL
 	}
-	pp := <-c.packets
-	n = copy(p, pp.buf)
-	return n, pp.addr, nil
+	select {
+	case pp := <-c.packets:
+		return copy(p, pp.buf), pp.addr, nil
+	case <-c.readDeadline:
+		return 0, nil, ErrDeadline
+	case <-c.deadline:
+		return 0, nil, ErrDeadline
+	}
 }
 
 // WriteTo writes a packet with payload p to addr.
@@ -61,11 +72,17 @@ func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
 	if !c.ok() {
 		return 0, syscall.EINVAL
 	}
-	c.net.peers[addrKey(a)].packets <- packet{
+	select {
+	case c.net.peers[addrKey(a)].packets <- packet{
 		addr: c.addr,
 		buf:  append([]byte{}, p...),
+	}:
+		return len(p), nil
+	case <-c.writeDeadline:
+		return 0, ErrDeadline
+	case <-c.deadline:
+		return 0, ErrDeadline
 	}
-	return len(p), nil
 }
 
 func (c *PacketConn) LocalAddr() net.Addr { return c.addr }
@@ -85,9 +102,42 @@ func (c *PacketConn) Close() error {
 	return nil
 }
 
-func (*PacketConn) SetDeadline(t time.Time) error      { panic("implement me") }
-func (*PacketConn) SetReadDeadline(t time.Time) error  { panic("implement me") }
-func (*PacketConn) SetWriteDeadline(t time.Time) error { panic("implement me") }
+type notifier chan struct{}
+
+func simpleDeadline(t time.Time) notifier {
+	deadline := make(notifier)
+	go func() {
+		now := time.Now()
+		<-time.After(t.Sub(now))
+		close(deadline)
+	}()
+
+	return deadline
+}
+
+func (c *PacketConn) SetDeadline(t time.Time) error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	c.deadline = simpleDeadline(t)
+	return nil
+}
+
+func (c *PacketConn) SetReadDeadline(t time.Time) error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	c.readDeadline = simpleDeadline(t)
+	return nil
+}
+
+func (c *PacketConn) SetWriteDeadline(t time.Time) error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	c.writeDeadline = simpleDeadline(t)
+	return nil
+}
 
 type NetAddr struct {
 	Net     string

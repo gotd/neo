@@ -124,3 +124,54 @@ func TestNetPing(t *testing.T) {
 		t.Error("timed out")
 	}
 }
+
+func TestNetPingDeadline(t *testing.T) {
+	nt := &Net{
+		peers: make(map[string]*PacketConn),
+	}
+	left, err := nt.ListenPacket("udp", "10.0.0.1:123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	right, err := nt.ListenPacket("udp", "10.0.0.2:123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &pingServer{conn: left}
+	finished := make(chan struct{})
+	go func() {
+		if listenErr := s.Listen(); listenErr != nil {
+			// Wait for close.
+			if e, ok := listenErr.(syscall.Errno); ok {
+				if e != syscall.EINVAL {
+					t.Error(e)
+				}
+			} else {
+				t.Error(listenErr)
+			}
+		}
+		finished <- struct{}{}
+	}()
+
+	c := &pingClient{conn: right}
+	if err = right.SetReadDeadline(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond * 10)
+	if err = c.Ping(left.LocalAddr()); err == nil {
+		t.Error("should error!")
+	}
+
+	if err = right.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = left.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+		// OK
+	case <-time.After(time.Second * 10):
+		t.Error("timed out")
+	}
+}
