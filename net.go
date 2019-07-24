@@ -28,6 +28,7 @@ type PacketConn struct {
 	closedMux sync.Mutex
 	closed    bool
 
+	mux           sync.Mutex
 	deadline      notifier
 	readDeadline  notifier
 	writeDeadline notifier
@@ -57,12 +58,18 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if !c.ok() {
 		return 0, nil, syscall.EINVAL
 	}
+
+	c.mux.Lock()
+	deadline := c.deadline
+	readDeadline := c.readDeadline
+	c.mux.Unlock()
+
 	select {
 	case pp := <-c.packets:
 		return copy(p, pp.buf), pp.addr, nil
-	case <-c.readDeadline:
+	case <-readDeadline:
 		return 0, nil, ErrDeadline
-	case <-c.deadline:
+	case <-deadline:
 		return 0, nil, ErrDeadline
 	}
 }
@@ -72,15 +79,21 @@ func (c *PacketConn) WriteTo(p []byte, a net.Addr) (n int, err error) {
 	if !c.ok() {
 		return 0, syscall.EINVAL
 	}
+
+	c.mux.Lock()
+	deadline := c.deadline
+	writeDeadline := c.writeDeadline
+	c.mux.Unlock()
+
 	select {
 	case c.net.peers[addrKey(a)].packets <- packet{
 		addr: c.addr,
 		buf:  append([]byte{}, p...),
 	}:
 		return len(p), nil
-	case <-c.writeDeadline:
+	case <-writeDeadline:
 		return 0, ErrDeadline
-	case <-c.deadline:
+	case <-deadline:
 		return 0, ErrDeadline
 	}
 }
@@ -119,7 +132,9 @@ func (c *PacketConn) SetDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
+	c.mux.Lock()
 	c.deadline = simpleDeadline(t)
+	c.mux.Unlock()
 	return nil
 }
 
@@ -127,7 +142,9 @@ func (c *PacketConn) SetReadDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
+	c.mux.Lock()
 	c.readDeadline = simpleDeadline(t)
+	c.mux.Unlock()
 	return nil
 }
 
@@ -135,7 +152,9 @@ func (c *PacketConn) SetWriteDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
+	c.mux.Lock()
 	c.writeDeadline = simpleDeadline(t)
+	c.mux.Unlock()
 	return nil
 }
 
