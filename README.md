@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/gortc/neo.svg?branch=master)](https://travis-ci.com/gortc/neo)
 [![codecov](https://codecov.io/gh/gortc/neo/branch/master/graph/badge.svg)](https://codecov.io/gh/gortc/neo)
-[![GoDoc](https://godoc.org/github.com/gortc/neo?status.svg)](https://godoc.org/github.com/gortc/neo)
+[![GoDoc](https://godoc.org/gortc.io/neo?status.svg)](https://godoc.org/gortc.io/neo)
 
 # neo
 
