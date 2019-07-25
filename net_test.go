@@ -157,7 +157,7 @@ func TestNetPingDeadline(t *testing.T) {
 	if err = right.SetReadDeadline(time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 100)
 	if err = c.Ping(left.LocalAddr()); err == nil {
 		t.Error("should error!")
 	}
