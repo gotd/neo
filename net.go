@@ -203,3 +203,27 @@ func (n *Net) ListenPacket(network, address string) (net.PacketConn, error) {
 	n.peers[addrKey(a)] = pc
 	return pc, nil
 }
+
+// NAT implements facility for Network Address Translation simulation.
+//
+// Basic example:
+// 	[ A ] <-----> [ NAT1 ] <-----> [ NAT2 ] <-----> [ B ]
+//      IPa              IPa'     IPb'             IPb
+//
+// 	1) A sends packet P with dst = IPb'
+//  2) NAT1 receives packet P and changes it's src to IPa',
+//   sending it to NAT2 from IPa'.
+//  3) NAT2 receives packet P from IPa' to IPb', does a lookup to
+//   NAT translation table and finds association IPb' <-> IPb.
+//   Then it sends packet P to B.
+//  4) B receives packet P from NAT2, observing that it has src = IPa'.
+//
+//  Now B can repeat steps 1-4 and send packet back.
+//
+//  IPa  = 10.5.0.1:30000
+//  IPa' = 83.30.100.1:23100
+//  IPb' = 91.10.100.1:13000
+//  IPb  = 10.1.0.1:20000
+type NAT struct {
+	// TODO(ar): implement
+}
