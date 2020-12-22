@@ -11,57 +11,92 @@ linters-settings:
     threshold: 100
   goconst:
     min-len: 2
-    min-occurrences: 2
+    min-occurrences: 3
   misspell:
     locale: US
   lll:
     line-length: 140
   goimports:
-    local-prefixes: gortc.io
+    local-prefixes: github.com/gotd/
   gocritic:
     enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
       - performance
       - style
-      - experimental
     disabled-checks:
-      - commentedOutCode
-      - sloppyReassign
+      - hugeParam
+      - rangeValCopy
+      - exitAfterDefer
+      - whyNoLint
+      - singleCaseSwitch
+      - octalLiteral
+
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - scopelint
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    - gocognit
+
+  # Do not enable:
+  # - wsl       (too opinionated about newlines)
+  # - godox     (todos are OK)
+  # - bodyclose (false positives on helper functions)
+  # - prealloc  (not worth it in scope of this project)
+  # - maligned  (same as prealloc)
+  # - funlen    (gocyclo is enough)
 
 issues:
   exclude-rules:
-    # Exclude some linters from running on tests files.
+    # Exclude go:generate from lll
+    - source: "//go:generate"
+      linters: [lll]
+
+    # Disable linters that are annoying in tests.
     - path: _test\.go
       linters:
         - gocyclo
         - errcheck
         - dupl
         - gosec
+        - funlen
         - goconst
-
-    # Ease some gocritic warnings on test files.
-    - path: _test\.go
-      text: "(unnamedResult|exitAfterDefer|unlambda)"
-      linters:
-        - gocritic
-
-    - path: ^cmd/
-      linters:
-        - gocyclo
-    - path: ^cmd/
-      text: "(unnamedResult|exitAfterDefer)"
-      linters:
-        - gocritic
-
-linters:
-  enable-all: true
-  disable:
-    - prealloc
-    - gochecknoglobals
-    - scopelint
-
-run:
-  skip-dirs:
-    - e2e
-    - fuzz
-    - testdata
-    - api
+        - gocognit
+        - scopelint
+        - lll
+        - gochecknoglobals
+    # Ignore shadowing of err.
+    - linters: [govet]
+      text: 'declaration of "err"'
+    # Ignore linters in main packages.
+    - path: main\.go
+      linters: [gochecknoglobals, goconst, funlen, gocognit, gocyclo]

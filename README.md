@@ -1,7 +1,3 @@
-[![Build Status](https://travis-ci.com/gortc/neo.svg?branch=master)](https://travis-ci.com/gortc/neo)
-[![codecov](https://codecov.io/gh/gortc/neo/branch/master/graph/badge.svg)](https://codecov.io/gh/gortc/neo)
-[![GoDoc](https://godoc.org/gortc.io/neo?status.svg)](https://godoc.org/gortc.io/neo)
-
 # neo
 
 Package `neo` implements side effects (network, time) simulation for testing.
@@ -19,7 +15,7 @@ import (
 	"fmt"
 	"time"
 
-	"gortc.io/neo"
+	"github.com/gotd/neo"
 )
 
 func main() {

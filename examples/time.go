@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"gortc.io/neo"
+	"github.com/gotd/neo"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-lint:
-	golangci-lint run
 test:
 	@./go.test.sh
+coverage:
+	@./go.coverage.sh

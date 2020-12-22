@@ -1,3 +1,3 @@
-module gortc.io/neo
+module github.com/gotd/neo
 
 go 1.12
