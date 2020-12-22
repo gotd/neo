@@ -21,3 +21,23 @@ func TestTime(t *testing.T) {
 		t.Fatal("10 second shift failed")
 	}
 }
+
+func TestTime_After(t *testing.T) {
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	after := sim.After(time.Second)
+
+	select {
+	case <-after:
+		t.Error("unexpected done")
+	default:
+	}
+
+	sim.Travel(time.Second*1 + time.Microsecond)
+	select {
+	case <-after:
+	default:
+		t.Error("unexpected state")
+	}
+}
