@@ -3,6 +3,8 @@ package neo
 import (
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func TestTime(t *testing.T) {
@@ -39,5 +41,26 @@ func TestTime_After(t *testing.T) {
 	case <-after:
 	default:
 		t.Error("unexpected state")
+	}
+}
+
+func TestTime_Observe(t *testing.T) {
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	var g errgroup.Group
+	observe := sim.Observe()
+	g.Go(func() error {
+		<-observe
+		sim.Travel(time.Second * 2)
+		return nil
+	})
+	g.Go(func() error {
+		<-sim.After(time.Second)
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		t.Error(err)
 	}
 }

@@ -19,7 +19,8 @@ type Time struct {
 	mux sync.Mutex
 	now time.Time
 
-	moments []moment
+	moments   []moment
+	observers []chan struct{}
 }
 
 func (t *Time) plan(when time.Time, do func(now time.Time)) {
@@ -30,6 +31,7 @@ func (t *Time) plan(when time.Time, do func(now time.Time)) {
 		when: when,
 		do:   do,
 	})
+	t.observe()
 }
 
 // tick applies all scheduled temporal effects.
@@ -118,4 +120,21 @@ func (t *Time) After(d time.Duration) <-chan time.Time {
 		done <- now
 	})
 	return done
+}
+
+// Observe return channel that closes on clock calls.
+func (t *Time) Observe() <-chan struct{} {
+	observer := make(chan struct{})
+	t.mux.Lock()
+	t.observers = append(t.observers, observer)
+	t.mux.Unlock()
+
+	return observer
+}
+
+func (t *Time) observe() {
+	for _, observer := range t.observers {
+		close(observer)
+	}
+	t.observers = t.observers[:0]
 }
