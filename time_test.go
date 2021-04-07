@@ -64,3 +64,81 @@ func TestTime_Observe(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestTime_Timer(t *testing.T) {
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	after := sim.Timer(time.Second)
+	defer after.Stop()
+
+	select {
+	case <-after.C():
+		t.Error("unexpected done")
+	default:
+	}
+
+	sim.Travel(time.Second*1 + time.Microsecond)
+	select {
+	case <-after.C():
+	default:
+		t.Error("unexpected state")
+	}
+
+	after.Reset(time.Second)
+
+	select {
+	case <-after.C():
+		t.Error("unexpected done")
+	default:
+	}
+
+	sim.Travel(time.Second*1 + time.Microsecond)
+	select {
+	case <-after.C():
+	default:
+		t.Error("unexpected state")
+	}
+}
+
+func TestTime_Ticker(t *testing.T) {
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	after := sim.Ticker(2 * time.Second)
+	defer after.Stop()
+
+	// Tick a bit.
+	for range [3]struct{}{} {
+		select {
+		case <-after.C():
+			t.Error("unexpected done")
+		default:
+		}
+
+		sim.Travel(2*time.Second + time.Microsecond)
+		select {
+		case <-after.C():
+		default:
+			t.Error("unexpected state")
+		}
+	}
+
+	after.Reset(time.Second)
+
+	// Tick faster a bit.
+	for range [3]struct{}{} {
+		select {
+		case <-after.C():
+			t.Error("unexpected done")
+		default:
+		}
+
+		sim.Travel(time.Second + time.Microsecond)
+		select {
+		case <-after.C():
+		default:
+			t.Error("unexpected state")
+		}
+	}
+}

@@ -1,14 +1,31 @@
 package neo
 
 import (
+	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// Timer abstracts a single event.
+type Timer interface {
+	C() <-chan time.Time
+	Stop() bool
+	Reset(d time.Duration)
+}
+
+// Ticker abstracts a channel that delivers ``ticks'' of a clock at intervals.
+type Ticker interface {
+	C() <-chan time.Time
+	Stop()
+	Reset(d time.Duration)
+}
 
 // NewTime returns new temporal simulator.
 func NewTime(now time.Time) *Time {
 	return &Time{
-		now: now,
+		now:     now,
+		moments: map[int]moment{},
 	}
 }
 
@@ -16,50 +33,106 @@ func NewTime(now time.Time) *Time {
 //
 // All methods are goroutine-safe.
 type Time struct {
-	mux sync.Mutex
-	now time.Time
+	mux      sync.Mutex
+	now      time.Time
+	momentID int
 
-	moments   []moment
+	moments   map[int]moment
 	observers []chan struct{}
 }
 
-func (t *Time) plan(when time.Time, do func(now time.Time)) {
+func (t *Time) Timer(d time.Duration) Timer {
+	done := make(chan time.Time, 1)
+
+	return timer{
+		time: t,
+		ch:   done,
+		id: t.plan(t.When(d), func(now time.Time) {
+			done <- now
+		}),
+	}
+}
+
+func (t *Time) Ticker(d time.Duration) Ticker {
+	done := make(chan time.Time, 1)
+
+	tick := &ticker{
+		time: t,
+		ch:   done,
+		dur:  int64(d),
+	}
+
+	var cb func(now time.Time)
+	cb = func(now time.Time) {
+		done <- now
+
+		dur := time.Duration(atomic.LoadInt64(&tick.dur))
+		t.plan(now.Add(dur), cb)
+	}
+	tick.id = t.plan(t.When(d), cb)
+
+	return tick
+}
+
+func (t *Time) plan(when time.Time, do func(now time.Time)) int {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
-	t.moments = append(t.moments, moment{
+	id := t.momentID
+	t.momentID++
+	t.moments[t.momentID] = moment{
 		when: when,
 		do:   do,
-	})
+	}
 	t.observe()
+	return id
+}
+
+func (t *Time) stopTimer(id int) bool {
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	_, ok := t.moments[id]
+	delete(t.moments, id)
+	return !ok
+}
+
+func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	m, ok := t. /* bruh */ moments[id]
+	if !ok {
+		m = moment{
+			do: func(now time.Time) {
+				ch <- now
+			},
+		}
+	}
+
+	delete(t.moments, id)
+	m.when = t.now.Add(d)
+	t.moments[id] = m
+
+	return
 }
 
 // tick applies all scheduled temporal effects.
 //
 // The mux lock is expected.
-func (t *Time) tick() {
-	var (
-		past   []moment
-		future []moment
-	)
-	for _, m := range t.moments {
-		switch {
-		case m.when.After(t.now):
-			future = append(future, m)
-		case m.when.Before(t.now):
-			past = append(past, m)
+func (t *Time) tick() moments {
+	var past moments
+
+	for id, m := range t.moments {
+		if m.when.After(t.now) {
+			continue
 		}
+		delete(t.moments, id)
+		past = append(past, m)
 	}
+	sort.Sort(past)
 
-	t.moments = future
-	for _, m := range past {
-		m.do(t.now)
-	}
-}
-
-type moment struct {
-	when time.Time
-	do   func(time time.Time)
+	return past
 }
 
 // Now returns the current time.
@@ -76,8 +149,8 @@ func (t *Time) Now() time.Time {
 func (t *Time) Set(now time.Time) {
 	t.mux.Lock()
 	t.now = now
-	t.tick()
 	t.mux.Unlock()
+	t.tick().do(now)
 }
 
 // Travel adds duration to current time and returns result.
@@ -87,8 +160,8 @@ func (t *Time) Travel(d time.Duration) time.Time {
 	t.mux.Lock()
 	now := t.now.Add(d)
 	t.now = now
-	t.tick()
 	t.mux.Unlock()
+	t.tick().do(now)
 	return now
 }
 
@@ -99,8 +172,8 @@ func (t *Time) TravelDate(years, months, days int) time.Time {
 	t.mux.Lock()
 	now := t.now.AddDate(years, months, days)
 	t.now = now
-	t.tick()
 	t.mux.Unlock()
+	t.tick().do(now)
 	return now
 }
 
