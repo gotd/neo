@@ -9,9 +9,9 @@ type moment struct {
 
 type moments []moment
 
-func (m moments) do(time time.Time) {
+func (m moments) do(t time.Time) {
 	for _, doer := range m {
-		doer.do(time)
+		doer.do(t)
 	}
 }
 

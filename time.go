@@ -113,8 +113,6 @@ func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
 	delete(t.moments, id)
 	m.when = t.now.Add(d)
 	t.moments[id] = m
-
-	return
 }
 
 // tick applies all scheduled temporal effects.
