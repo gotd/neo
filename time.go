@@ -67,17 +67,14 @@ func (t *Time) Ticker(d time.Duration) Ticker {
 		done <- now
 
 		dur := time.Duration(atomic.LoadInt64(&tick.dur))
-		t.plan(now.Add(dur), cb)
+		t.planUnlocked(now.Add(dur), cb)
 	}
 	tick.id = t.plan(t.When(d), cb)
 
 	return tick
 }
 
-func (t *Time) plan(when time.Time, do func(now time.Time)) int {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-
+func (t *Time) planUnlocked(when time.Time, do func(now time.Time)) int {
 	id := t.momentID
 	t.momentID++
 	t.moments[t.momentID] = moment{
@@ -86,6 +83,13 @@ func (t *Time) plan(when time.Time, do func(now time.Time)) int {
 	}
 	t.observe()
 	return id
+}
+
+func (t *Time) plan(when time.Time, do func(now time.Time)) int {
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	return t.planUnlocked(when, do)
 }
 
 func (t *Time) stopTimer(id int) bool {
@@ -158,8 +162,8 @@ func (t *Time) Travel(d time.Duration) time.Time {
 	t.mux.Lock()
 	now := t.now.Add(d)
 	t.now = now
-	t.mux.Unlock()
 	t.tick().do(now)
+	t.mux.Unlock()
 	return now
 }
 
@@ -170,8 +174,8 @@ func (t *Time) TravelDate(years, months, days int) time.Time {
 	t.mux.Lock()
 	now := t.now.AddDate(years, months, days)
 	t.now = now
-	t.mux.Unlock()
 	t.tick().do(now)
+	t.mux.Unlock()
 	return now
 }
 
