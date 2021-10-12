@@ -98,7 +98,7 @@ func (t *Time) stopTimer(id int) bool {
 
 	_, ok := t.moments[id]
 	delete(t.moments, id)
-	return !ok
+	return ok
 }
 
 func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
