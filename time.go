@@ -77,7 +77,7 @@ func (t *Time) Ticker(d time.Duration) Ticker {
 func (t *Time) planUnlocked(when time.Time, do func(now time.Time)) int {
 	id := t.momentID
 	t.momentID++
-	t.moments[t.momentID] = moment{
+	t.moments[id] = moment{
 		when: when,
 		do:   do,
 	}
@@ -105,7 +105,7 @@ func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
-	m, ok := t. /* bruh */ moments[id]
+	m, ok := t.moments[id]
 	if !ok {
 		m = moment{
 			do: func(now time.Time) {
@@ -114,7 +114,6 @@ func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
 		}
 	}
 
-	delete(t.moments, id)
 	m.when = t.now.Add(d)
 	t.moments[id] = m
 }
