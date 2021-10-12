@@ -101,6 +101,35 @@ func TestTime_Timer(t *testing.T) {
 	}
 }
 
+func TestTime_TimerReset(t *testing.T) {
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	after := sim.Timer(time.Second)
+	defer after.Stop()
+
+	if !after.Stop() {
+		t.Error("unexpected state")
+	}
+	after.Reset(time.Second)
+
+	select {
+	case <-after.C():
+		t.Error("unexpected done")
+	default:
+	}
+
+	sim.Travel(time.Second)
+	select {
+	case <-after.C():
+	default:
+		t.Error("unexpected state")
+	}
+	if after.Stop() {
+		t.Error("unexpected state")
+	}
+}
+
 func TestTime_Ticker(t *testing.T) {
 	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
 	sim := NewTime(now)
