@@ -171,3 +171,50 @@ func TestTime_Ticker(t *testing.T) {
 		}
 	}
 }
+
+func TestTime_TickerStop(t *testing.T) {
+	const interval = time.Second
+
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	ticker := sim.Ticker(interval)
+	defer ticker.Stop()
+
+	// Tick once and stop ticker.
+	sim.Travel(interval)
+	select {
+	case <-ticker.C():
+	default:
+		t.Error("unexpected state")
+	}
+	ticker.Stop()
+
+	// Advance time by the tick interval and check that the tick was not
+	// sent on the channel.
+	sim.Travel(interval)
+	select {
+	case <-ticker.C():
+		t.Error("unexpected state")
+	default:
+	}
+
+	// Check that we can reset the ticker after stopping it and there are no
+	// erroneous ticks.
+	ticker.Reset(interval)
+	for range [3]struct{}{} {
+		select {
+		case <-ticker.C():
+			t.Error("unexpected done")
+		default:
+		}
+
+		sim.Travel(interval)
+
+		select {
+		case <-ticker.C():
+		default:
+			t.Error("unexpected state")
+		}
+	}
+}

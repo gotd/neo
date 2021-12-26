@@ -3,7 +3,6 @@ package neo
 import (
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -54,23 +53,12 @@ func (t *Time) Timer(d time.Duration) Timer {
 }
 
 func (t *Time) Ticker(d time.Duration) Ticker {
-	done := make(chan time.Time, 1)
-
 	tick := &ticker{
 		time: t,
-		ch:   done,
-		dur:  int64(d),
+		ch:   make(chan time.Time, 1),
+		dur:  d,
 	}
-
-	var cb func(now time.Time)
-	cb = func(now time.Time) {
-		done <- now
-
-		dur := time.Duration(atomic.LoadInt64(&tick.dur))
-		t.planUnlocked(now.Add(dur), cb)
-	}
-	tick.id = t.plan(t.When(d), cb)
-
+	tick.id = t.plan(t.When(d), tick.do)
 	return tick
 }
 
@@ -112,6 +100,23 @@ func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
 				ch <- now
 			},
 		}
+	}
+
+	m.when = t.now.Add(d)
+	t.moments[id] = m
+}
+
+// resetTicker resets the moment of the given ticker to run after the duration d.
+func (t *Time) resetTicker(tick *ticker, d time.Duration) {
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	tick.dur = d
+	id := tick.id
+
+	m, ok := t.moments[id]
+	if !ok {
+		m = moment{do: tick.do}
 	}
 
 	m.when = t.now.Add(d)
