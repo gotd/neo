@@ -218,3 +218,30 @@ func TestTime_TickerStop(t *testing.T) {
 		}
 	}
 }
+
+func TestTime_ObserveTick(t *testing.T) {
+	const interval = time.Second
+
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	ticker := sim.Ticker(interval)
+	defer ticker.Stop()
+
+	// Check that we do not break existing users of the Time implementation:
+	// the observe channel must be closed on each tick.
+	for range [3]struct{}{} {
+		observe := sim.Observe()
+		sim.Travel(interval)
+		select {
+		case <-ticker.C():
+		default:
+			t.Error("unexpected state")
+		}
+		select {
+		case <-observe:
+		default:
+			t.Error("missing observation on tick")
+		}
+	}
+}

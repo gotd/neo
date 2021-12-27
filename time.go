@@ -32,6 +32,8 @@ func NewTime(now time.Time) *Time {
 //
 // All methods are goroutine-safe.
 type Time struct {
+	// mux guards internal state. Note that all methods without Unlocked
+	// suffix acquire mux.
 	mux      sync.Mutex
 	now      time.Time
 	momentID int
@@ -41,25 +43,22 @@ type Time struct {
 }
 
 func (t *Time) Timer(d time.Duration) Timer {
-	done := make(chan time.Time, 1)
-
-	return timer{
+	tt := &timer{
 		time: t,
-		ch:   done,
-		id: t.plan(t.When(d), func(now time.Time) {
-			done <- now
-		}),
+		ch:   make(chan time.Time, 1),
 	}
+	tt.id = t.plan(t.When(d), tt.do)
+	return tt
 }
 
 func (t *Time) Ticker(d time.Duration) Ticker {
-	tick := &ticker{
+	tt := &ticker{
 		time: t,
 		ch:   make(chan time.Time, 1),
 		dur:  d,
 	}
-	tick.id = t.plan(t.When(d), tick.do)
-	return tick
+	tt.id = t.plan(t.When(d), tt.do)
+	return tt
 }
 
 func (t *Time) planUnlocked(when time.Time, do func(now time.Time)) int {
@@ -69,7 +68,7 @@ func (t *Time) planUnlocked(when time.Time, do func(now time.Time)) int {
 		when: when,
 		do:   do,
 	}
-	t.observe()
+	t.observeUnlocked()
 	return id
 }
 
@@ -80,7 +79,9 @@ func (t *Time) plan(when time.Time, do func(now time.Time)) int {
 	return t.planUnlocked(when, do)
 }
 
-func (t *Time) stopTimer(id int) bool {
+// stop removes the moment with the given ID from the list of scheduled moments.
+// It returns true if a moment existed for the given ID, otherwise it is no-op.
+func (t *Time) stop(id int) bool {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
@@ -89,44 +90,32 @@ func (t *Time) stopTimer(id int) bool {
 	return ok
 }
 
-func (t *Time) resetTimer(d time.Duration, id int, ch chan time.Time) {
+// reset adjusts the moment with the given ID to run after the d duration. It
+// creates a new moment if the moment does not already exist. If durp pointer
+// is not nil, it is updated with d value while reset is holding Time’s lock.
+func (t *Time) reset(d time.Duration, id int, do func(now time.Time), durp *time.Duration) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
+	t.resetUnlocked(d, id, do, durp)
+}
+
+// resetUnlocked is like reset but does not acquire the Time’s lock.
+func (t *Time) resetUnlocked(d time.Duration, id int, do func(now time.Time), durp *time.Duration) {
+	if durp != nil {
+		*durp = d
+	}
 
 	m, ok := t.moments[id]
 	if !ok {
-		m = moment{
-			do: func(now time.Time) {
-				ch <- now
-			},
-		}
+		m = moment{do: do}
 	}
 
 	m.when = t.now.Add(d)
 	t.moments[id] = m
 }
 
-// resetTicker resets the moment of the given ticker to run after the duration d.
-func (t *Time) resetTicker(tick *ticker, d time.Duration) {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-
-	tick.dur = d
-	id := tick.id
-
-	m, ok := t.moments[id]
-	if !ok {
-		m = moment{do: tick.do}
-	}
-
-	m.when = t.now.Add(d)
-	t.moments[id] = m
-}
-
-// tick applies all scheduled temporal effects.
-//
-// The mux lock is expected.
-func (t *Time) tick() moments {
+// tickUnlocked applies all scheduled temporal effects.
+func (t *Time) tickUnlocked() moments {
 	var past moments
 
 	for id, m := range t.moments {
@@ -144,9 +133,8 @@ func (t *Time) tick() moments {
 // Now returns the current time.
 func (t *Time) Now() time.Time {
 	t.mux.Lock()
-	now := t.now
-	t.mux.Unlock()
-	return now
+	defer t.mux.Unlock()
+	return t.now
 }
 
 // Set travels to specified time.
@@ -154,9 +142,8 @@ func (t *Time) Now() time.Time {
 // Also triggers temporal effects.
 func (t *Time) Set(now time.Time) {
 	t.mux.Lock()
-	t.now = now
-	t.mux.Unlock()
-	t.tick().do(now)
+	defer t.mux.Unlock()
+	t.setUnlocked(now)
 }
 
 // Travel adds duration to current time and returns result.
@@ -164,10 +151,9 @@ func (t *Time) Set(now time.Time) {
 // Also triggers temporal effects.
 func (t *Time) Travel(d time.Duration) time.Time {
 	t.mux.Lock()
+	defer t.mux.Unlock()
 	now := t.now.Add(d)
-	t.now = now
-	t.tick().do(now)
-	t.mux.Unlock()
+	t.setUnlocked(now)
 	return now
 }
 
@@ -176,11 +162,17 @@ func (t *Time) Travel(d time.Duration) time.Time {
 // Also triggers temporal effects.
 func (t *Time) TravelDate(years, months, days int) time.Time {
 	t.mux.Lock()
+	defer t.mux.Unlock()
 	now := t.now.AddDate(years, months, days)
-	t.now = now
-	t.tick().do(now)
-	t.mux.Unlock()
+	t.setUnlocked(now)
 	return now
+}
+
+// setUnlocked sets the current time to the given now time and triggers temporal
+// effects.
+func (t *Time) setUnlocked(now time.Time) {
+	t.now = now
+	t.tickUnlocked().do(now)
 }
 
 // Sleep blocks until duration is elapsed.
@@ -201,7 +193,8 @@ func (t *Time) After(d time.Duration) <-chan time.Time {
 	return done
 }
 
-// Observe return channel that closes on clock calls.
+// Observe return channel that closes on clock calls. The current implementation
+// also closes the channel on Ticker’s ticks.
 func (t *Time) Observe() <-chan struct{} {
 	observer := make(chan struct{})
 	t.mux.Lock()
@@ -211,7 +204,7 @@ func (t *Time) Observe() <-chan struct{} {
 	return observer
 }
 
-func (t *Time) observe() {
+func (t *Time) observeUnlocked() {
 	for _, observer := range t.observers {
 		close(observer)
 	}
