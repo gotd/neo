@@ -126,6 +126,8 @@ func TestNetPing(t *testing.T) {
 }
 
 func TestNetPingDeadline(t *testing.T) {
+	t.Skip("skipping flaky test, see https://github.com/gotd/neo/pull/13#issuecomment-1001285136")
+
 	nt := &Net{
 		peers: make(map[string]*PacketConn),
 	}
