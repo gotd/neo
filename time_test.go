@@ -265,3 +265,34 @@ func TestTime_Sleep(t *testing.T) {
 	sim.Travel(interval)
 	wg.Wait()
 }
+
+func TestTime_TravelSteps(t *testing.T) {
+	const (
+		step = time.Second
+		n    = 5
+	)
+
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	timer := sim.Timer(n * step)
+	defer timer.Stop()
+
+	// Make all steps except the last one.
+	for i := 1; i < n; i++ {
+		sim.Travel(step)
+		select {
+		case <-timer.C():
+			t.Fatal("unexpected state")
+		default:
+		}
+	}
+
+	// Make the last step.
+	sim.Travel(step)
+	select {
+	case <-timer.C():
+	default:
+		t.Fatal("unexpected state")
+	}
+}
