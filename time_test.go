@@ -1,6 +1,7 @@
 package neo
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -244,4 +245,23 @@ func TestTime_ObserveTick(t *testing.T) {
 			t.Error("missing observation on tick")
 		}
 	}
+}
+
+func TestTime_Sleep(t *testing.T) {
+	const interval = time.Second
+
+	now := time.Date(2049, 5, 6, 23, 55, 11, 1034, time.UTC)
+	sim := NewTime(now)
+
+	observe := sim.Observe()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sim.Sleep(interval)
+	}()
+	<-observe
+	sim.Travel(interval)
+	wg.Wait()
 }
