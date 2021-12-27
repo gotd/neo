@@ -31,13 +31,10 @@ func (t *ticker) do(now time.Time) {
 
 	// It is safe to mutate ID without a lock since at most one moment
 	// exists for the given ticker and moments run under the Time’s lock.
-	//
-	// Additionally, while we probably should be resetting the moment with
-	// the initial ticker’s ID, it is not possible since that would break
-	// backwards compatibility for users that rely on Time’s Observe method
-	// to observe ticks.
-	//
-	//  t.time.resetUnlocked(t.dur, t.id, t.do, nil)
-	//
-	t.id = t.time.planUnlocked(now.Add(t.dur), t.do)
+	t.time.resetUnlocked(t.dur, t.id, t.do, nil)
+
+	// Ticker used to create a new moment for each tick and that would close
+	// the observe channel. Maintain backwards compatibility for users that
+	// may rely on this behavior.
+	t.time.observeUnlocked()
 }
